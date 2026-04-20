@@ -29,3 +29,44 @@ impl StayinAlive for StayinAliveService {
         }))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tokio::time::Instant;
+
+    #[tokio::test]
+    async fn ping_returns_pong() {
+        let svc = StayinAliveService;
+        let resp = svc.ping(Request::new(PingRequest {})).await.unwrap();
+        assert_eq!(resp.into_inner().message, "pong");
+    }
+
+    #[tokio::test]
+    async fn ping_me_later_returns_pong_after_delay() {
+        let svc = StayinAliveService;
+        let delay_ms = 100;
+        let start = Instant::now();
+        let resp = svc
+            .ping_me_later(Request::new(PingMeLaterRequest { delay_ms }))
+            .await
+            .unwrap();
+        let elapsed = start.elapsed();
+
+        assert_eq!(resp.into_inner().message, "pong");
+        assert!(
+            elapsed >= Duration::from_millis(delay_ms),
+            "expected at least {delay_ms}ms delay, got {elapsed:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn ping_me_later_zero_delay() {
+        let svc = StayinAliveService;
+        let resp = svc
+            .ping_me_later(Request::new(PingMeLaterRequest { delay_ms: 0 }))
+            .await
+            .unwrap();
+        assert_eq!(resp.into_inner().message, "pong");
+    }
+}
