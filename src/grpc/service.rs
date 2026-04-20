@@ -3,9 +3,7 @@ use std::time::Duration;
 use tonic::{Request, Response, Status};
 
 use crate::proto::stayin_alive_server::StayinAlive;
-use crate::proto::{
-    PingMeLaterRequest, PingMeLaterResponse, PingRequest, PingResponse,
-};
+use crate::proto::{PingMeLaterRequest, PingMeLaterResponse, PingRequest, PingResponse};
 
 #[derive(Debug, Default)]
 pub struct StayinAliveService;
@@ -13,10 +11,7 @@ pub struct StayinAliveService;
 #[tonic::async_trait]
 impl StayinAlive for StayinAliveService {
     /// Simple ping: returns immediately with a pong message.
-    async fn ping(
-        &self,
-        _request: Request<PingRequest>,
-    ) -> Result<Response<PingResponse>, Status> {
+    async fn ping(&self, _request: Request<PingRequest>) -> Result<Response<PingResponse>, Status> {
         Ok(Response::new(PingResponse {
             message: "pong".to_string(),
         }))

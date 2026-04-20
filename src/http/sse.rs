@@ -33,8 +33,8 @@ pub async fn sse_ping_handler(
 ) -> Sse<impl Stream<Item = Result<Event, std::convert::Infallible>>> {
     let interval = Duration::from_millis(params.interval_ms);
 
-    let stream = stream::repeat_with(|| Ok(Event::default().event("ping").data("ping")))
-        .throttle(interval);
+    let stream =
+        stream::repeat_with(|| Ok(Event::default().event("ping").data("ping"))).throttle(interval);
 
     Sse::new(stream).keep_alive(KeepAlive::default())
 }
