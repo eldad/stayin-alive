@@ -1,6 +1,7 @@
 use anyhow::Result;
 use tokio::signal;
 use tonic::transport::Server as TonicServer;
+use tower_http::trace::TraceLayer;
 use tracing::info;
 
 mod error;
@@ -66,6 +67,7 @@ async fn run() -> Result<(), AppError> {
         axum::serve(http_listener, http::router()).with_graceful_shutdown(shutdown_signal());
 
     let grpc_server = TonicServer::builder()
+        .layer(TraceLayer::new_for_grpc())
         .add_service(StayinAliveServer::new(StayinAliveService))
         .serve_with_shutdown(grpc_addr, shutdown_signal());
 

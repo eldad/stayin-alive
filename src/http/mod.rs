@@ -1,4 +1,5 @@
 use axum::{routing::get, Router};
+use tower_http::trace::TraceLayer;
 
 mod ping;
 mod sse;
@@ -14,6 +15,7 @@ pub fn router() -> Router {
         .route("/ping", get(ping_handler))
         .route("/sse-ping", get(sse_ping_handler))
         .route("/ws", get(ws_handler))
+        .layer(TraceLayer::new_for_http())
 }
 
 #[cfg(test)]
