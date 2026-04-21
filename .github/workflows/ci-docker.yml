@@ -17,13 +17,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt, clippy
-          targets: x86_64-unknown-linux-musl
-
-      - name: Install protoc and musl tools
-        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler musl-tools
+      - name: Install protoc
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
 
       - uses: actions/cache@v4
         with:
@@ -35,7 +30,7 @@ jobs:
 
       - run: cargo fmt --check
       - run: cargo clippy -- -D warnings
-      - run: cargo build --release --target x86_64-unknown-linux-musl
+      - run: cargo build --release
       - run: cargo test
 
       - name: Install grpcurl
@@ -63,7 +58,7 @@ jobs:
 
       - name: Run endpoint smoke tests
         run: |
-          target/x86_64-unknown-linux-musl/release/stayin-alive &
+          target/release/stayin-alive &
           SERVER_PID=$!
           trap 'kill "$SERVER_PID" 2>/dev/null || true' EXIT
           until curl -sf http://localhost:3000/ping > /dev/null 2>&1; do sleep 0.2; done
@@ -73,7 +68,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: stayin-alive-binary
-          path: target/x86_64-unknown-linux-musl/release/stayin-alive
+          path: target/release/stayin-alive
 
   docker:
     name: Docker
