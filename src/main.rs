@@ -4,6 +4,7 @@ use tonic::transport::Server as TonicServer;
 use tower_http::trace::TraceLayer;
 use tracing::info;
 
+mod apptracing;
 mod error;
 mod grpc;
 mod http;
@@ -24,12 +25,7 @@ const GRPC_ADDR: &str = "0.0.0.0:50051";
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    tracing_subscriber::fmt()
-        .with_env_filter(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "stayin_alive=info,tower_http=info".parse().unwrap()),
-        )
-        .init();
+    apptracing::setup_logging();
 
     run().await.map_err(anyhow::Error::from)
 }
