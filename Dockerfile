@@ -1,6 +1,6 @@
 FROM debian:stable-slim
 
-COPY target/release/stayin-alive /usr/local/bin/stayin-alive
+COPY stayin-alive /usr/local/bin/stayin-alive
 
 EXPOSE 3000 50051
 
