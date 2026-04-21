@@ -1,4 +1,4 @@
-use tracing_subscriber::{EnvFilter, fmt, fmt::format::FmtSpan, prelude::*};
+use tracing_subscriber::{fmt, fmt::format::FmtSpan, prelude::*, EnvFilter};
 
 pub fn setup_logging() {
     let env_filter = EnvFilter::try_from_default_env()
