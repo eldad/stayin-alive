@@ -8,11 +8,11 @@
 #               (default: <repo-root>/proto, resolved relative to this script)
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 HTTP_BASE="${HTTP_BASE:-http://localhost:3000}"
 GRPC_HOST="${GRPC_HOST:-localhost:50051}"
-PROTO_PATH="${PROTO_PATH:-${SCRIPT_DIR}/../proto}"
+PROTO_PATH="${PROTO_PATH:-${script_dir}/../proto}"
 
 pass() { echo "PASS"; }
 fail() { echo "FAIL: $*"; exit 1; }
