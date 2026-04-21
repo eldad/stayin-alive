@@ -38,6 +38,22 @@ jobs:
       - run: cargo build --release --target x86_64-unknown-linux-musl
       - run: cargo test
 
+      - name: Install grpcurl
+        env:
+          GRPCURL_VERSION: "1.9.1"
+        run: |
+          curl -sSL \
+            "https://github.com/fullstorydev/grpcurl/releases/download/v${GRPCURL_VERSION}/grpcurl_${GRPCURL_VERSION}_linux_x86_64.tar.gz" \
+            | sudo tar -xz -C /usr/local/bin grpcurl
+
+      - name: Run endpoint smoke tests
+        run: |
+          target/x86_64-unknown-linux-musl/release/stayin-alive &
+          SERVER_PID=$!
+          trap 'kill "$SERVER_PID" 2>/dev/null || true' EXIT
+          until curl -sf http://localhost:3000/ping > /dev/null 2>&1; do sleep 0.2; done
+          bash scripts/test-endpoints.sh
+
       - name: Upload binary artifact
         uses: actions/upload-artifact@v4
         with:
