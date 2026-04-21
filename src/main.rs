@@ -1,4 +1,5 @@
 use anyhow::Result;
+use tokio::signal;
 use tonic::transport::Server as TonicServer;
 use tracing::info;
 
@@ -32,6 +33,27 @@ async fn main() -> Result<()> {
     run().await.map_err(anyhow::Error::from)
 }
 
+/// Wait for a shutdown signal (SIGTERM or Ctrl-C).
+async fn shutdown_signal() {
+    let ctrl_c = signal::ctrl_c();
+
+    #[cfg(unix)]
+    {
+        let mut sigterm = signal::unix::signal(signal::unix::SignalKind::terminate())
+            .expect("install SIGTERM handler");
+        tokio::select! {
+            _ = ctrl_c => info!("received Ctrl-C, shutting down"),
+            _ = sigterm.recv() => info!("received SIGTERM, shutting down"),
+        }
+    }
+
+    #[cfg(not(unix))]
+    {
+        ctrl_c.await.ok();
+        info!("received Ctrl-C, shutting down");
+    }
+}
+
 async fn run() -> Result<(), AppError> {
     let http_addr: std::net::SocketAddr = HTTP_ADDR.parse()?;
     let grpc_addr: std::net::SocketAddr = GRPC_ADDR.parse()?;
@@ -40,11 +62,12 @@ async fn run() -> Result<(), AppError> {
     info!("gRPC server listening on {grpc_addr}");
 
     let http_listener = tokio::net::TcpListener::bind(http_addr).await?;
-    let http_server = axum::serve(http_listener, http::router());
+    let http_server =
+        axum::serve(http_listener, http::router()).with_graceful_shutdown(shutdown_signal());
 
     let grpc_server = TonicServer::builder()
         .add_service(StayinAliveServer::new(StayinAliveService))
-        .serve(grpc_addr);
+        .serve_with_shutdown(grpc_addr, shutdown_signal());
 
     // Run both servers concurrently; if either exits, propagate the error.
     tokio::select! {
