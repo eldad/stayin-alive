@@ -1,0 +1,96 @@
+name: CI & Docker
+
+on:
+  push:
+    branches: ["**"]
+    tags: ["v*"]
+
+env:
+  CARGO_TERM_COLOR: always
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  ci-docker:
+    name: CI & Docker
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install protoc
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - run: cargo fmt --check
+      - run: cargo clippy -- -D warnings
+      - run: cargo build --release
+      - run: cargo test
+
+      - name: Install grpcurl
+        env:
+          GRPCURL_VERSION: "1.9.1"
+          # SHA-256 of grpcurl_1.9.1_linux_x86_64.tar.gz
+          # Recompute with: sha256sum grpcurl_<version>_linux_x86_64.tar.gz
+          # grpcurl does not publish GPG/cosign signatures; the upstream
+          # checksums.txt and this pinned digest provide best-effort integrity.
+          GRPCURL_SHA256: "588c9c429476d9ed66cd3b2ae32283a6da36e0cfbb7e446f5d6a1b68dc770214"
+        run: |
+          BASE_URL="https://github.com/fullstorydev/grpcurl/releases/download/v${GRPCURL_VERSION}"
+          TARBALL="grpcurl_${GRPCURL_VERSION}_linux_x86_64.tar.gz"
+
+          curl -sSfL -o "/tmp/${TARBALL}"           "${BASE_URL}/${TARBALL}"
+          curl -sSfL -o /tmp/grpcurl_checksums.txt  "${BASE_URL}/grpcurl_${GRPCURL_VERSION}_checksums.txt"
+
+          # Verify against the upstream checksums file
+          (cd /tmp && sha256sum --check --ignore-missing grpcurl_checksums.txt)
+
+          # Verify against the digest pinned in this workflow (defence-in-depth)
+          echo "${GRPCURL_SHA256}  /tmp/${TARBALL}" | sha256sum --check
+
+          sudo tar -xz -C /usr/local/bin -f "/tmp/${TARBALL}" grpcurl
+
+      - name: Run endpoint smoke tests
+        run: |
+          target/release/stayin-alive &
+          SERVER_PID=$!
+          trap 'kill "$SERVER_PID" 2>/dev/null || true' EXIT
+          until curl -sf http://localhost:3000/ping > /dev/null 2>&1; do sleep 0.2; done
+          bash scripts/test-endpoints.sh
+
+      - name: Stage binary for Docker build
+        run: cp target/release/stayin-alive ./stayin-alive
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,format=long
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}

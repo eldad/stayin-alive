@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+package stayin_alive;
+
+service StayinAlive {
+  // Simple ping/pong reply.
+  rpc Ping (PingRequest) returns (PingResponse);
+
+  // Ping with a configurable delay before the reply is sent.
+  rpc PingMeLater (PingMeLaterRequest) returns (PingMeLaterResponse);
+}
+
+message PingRequest {}
+
+message PingResponse {
+  string message = 1;
+}
+
+message PingMeLaterRequest {
+  // Delay in milliseconds before the server sends the response.
+  uint64 delay_ms = 1;
+}
+
+message PingMeLaterResponse {
+  string message = 1;
+}
