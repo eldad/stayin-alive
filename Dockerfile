@@ -1,4 +1,4 @@
-FROM alpine:latest
+FROM debian:stable-slim
 
 COPY stayin-alive /usr/local/bin/stayin-alive
 
