@@ -2,6 +2,7 @@ use axum::{extract::Query, http::StatusCode, response::IntoResponse};
 use rand::Rng as _;
 use serde::Deserialize;
 use std::time::Duration;
+use tokio::time::sleep;
 
 /// Maximum total wait time (delay + jitter) in seconds.
 const MAX_TOTAL_SECONDS: f64 = 120.0;
@@ -50,7 +51,7 @@ pub async fn ping_delay_handler(Query(params): Query<PingDelayParams>) -> impl I
     let total = (params.delay + jitter_offset).max(0.0);
     let wait = Duration::from_secs_f64(total);
 
-    tokio::time::sleep(wait).await;
+    sleep(wait).await;
 
     (StatusCode::OK, "ping").into_response()
 }
