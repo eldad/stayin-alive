@@ -14,6 +14,7 @@ jobs:
   ci-docker:
     name: CI & Docker
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     permissions:
       contents: read
       packages: write
@@ -64,7 +65,7 @@ jobs:
           target/release/stayin-alive &
           SERVER_PID=$!
           trap 'kill "$SERVER_PID" 2>/dev/null || true' EXIT
-          until curl -sf http://localhost:3000/ping > /dev/null 2>&1; do sleep 0.2; done
+          until curl -sf http://localhost:8080/ping > /dev/null 2>&1; do sleep 0.2; done
           bash scripts/test-endpoints.sh
 
       - name: Stage binary for Docker build

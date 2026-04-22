@@ -2,16 +2,16 @@
 # Smoke-test every HTTP and gRPC endpoint.
 #
 # Environment variables (all optional):
-#   HTTP_BASE   Base URL of the HTTP server  (default: http://localhost:3000)
-#   GRPC_HOST   Host:port of the gRPC server (default: localhost:50051)
+#   HTTP_BASE   Base URL of the HTTP server  (default: http://localhost:8080)
+#   GRPC_HOST   Host:port of the gRPC server (default: localhost:6565)
 #   PROTO_PATH  Directory containing stayin_alive.proto
 #               (default: <repo-root>/proto, resolved relative to this script)
 set -euo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-HTTP_BASE="${HTTP_BASE:-http://localhost:3000}"
-GRPC_HOST="${GRPC_HOST:-localhost:50051}"
+HTTP_BASE="${HTTP_BASE:-http://localhost:8080}"
+GRPC_HOST="${GRPC_HOST:-localhost:6565}"
 PROTO_PATH="${PROTO_PATH:-${script_dir}/../proto}"
 
 pass() { echo "PASS"; }
@@ -46,6 +46,14 @@ http_code=$(curl -so /dev/null -w "%{http_code}" --max-time 2 \
   -H "Sec-WebSocket-Version: 13" \
   "${HTTP_BASE}/ws" 2>/dev/null || true)
 [ "${http_code}" = "101" ] || fail "expected HTTP 101, got '${http_code}'"
+pass
+
+# ---------------------------------------------------------------------------
+# HTTP /ping-delay
+# ---------------------------------------------------------------------------
+echo "==> GET /ping-delay"
+response=$(curl -sf "${HTTP_BASE}/ping-delay?delay=0&jitter=0")
+[ "${response}" = "ping" ] || fail "expected 'ping', got '${response}'"
 pass
 
 # ---------------------------------------------------------------------------
