@@ -2,6 +2,7 @@ use std::time::Duration;
 
 use tonic::{Request, Response, Status};
 
+use crate::metrics::ConnectionGuard;
 use crate::proto::stayin_alive_server::StayinAlive;
 use crate::proto::{PingMeLaterRequest, PingMeLaterResponse, PingRequest, PingResponse};
 
@@ -12,6 +13,7 @@ pub struct StayinAliveService;
 impl StayinAlive for StayinAliveService {
     /// Simple ping: returns immediately with a pong message.
     async fn ping(&self, _request: Request<PingRequest>) -> Result<Response<PingResponse>, Status> {
+        let _guard = ConnectionGuard::new("grpc");
         Ok(Response::new(PingResponse {
             message: "pong".to_string(),
         }))
@@ -22,6 +24,7 @@ impl StayinAlive for StayinAliveService {
         &self,
         request: Request<PingMeLaterRequest>,
     ) -> Result<Response<PingMeLaterResponse>, Status> {
+        let _guard = ConnectionGuard::new("grpc");
         let delay_ms = request.into_inner().delay_ms;
         tokio::time::sleep(Duration::from_millis(delay_ms)).await;
         Ok(Response::new(PingMeLaterResponse {

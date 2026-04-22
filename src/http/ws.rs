@@ -9,6 +9,8 @@ use axum::{
 };
 use serde::Deserialize;
 
+use crate::metrics::ConnectionGuard;
+
 /// Query parameters accepted by the WebSocket endpoint.
 #[derive(Debug, Deserialize)]
 pub struct WsPingParams {
@@ -36,6 +38,8 @@ pub async fn ws_handler(
 }
 
 async fn handle_socket(mut socket: WebSocket, interval: Duration) {
+    let _guard = ConnectionGuard::new("websocket");
+
     let mut ticker = tokio::time::interval(interval);
     // The first tick fires immediately; consume it so the first message is
     // sent after one full interval.

@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use anyhow::Result;
 use tokio::signal;
 use tonic::transport::Server as TonicServer;
@@ -8,6 +10,7 @@ mod apptracing;
 mod error;
 mod grpc;
 mod http;
+mod metrics;
 
 /// Generated protobuf types and gRPC server/client stubs.
 pub mod proto {
@@ -58,9 +61,12 @@ async fn run() -> Result<(), AppError> {
     info!("HTTP server listening on {http_addr}");
     info!("gRPC server listening on {grpc_addr}");
 
+    let prometheus_handle =
+        Arc::new(metrics::install().expect("failed to install Prometheus metrics recorder"));
+
     let http_listener = tokio::net::TcpListener::bind(http_addr).await?;
-    let http_server =
-        axum::serve(http_listener, http::router()).with_graceful_shutdown(shutdown_signal());
+    let http_server = axum::serve(http_listener, http::router(prometheus_handle))
+        .with_graceful_shutdown(shutdown_signal());
 
     let grpc_server = TonicServer::builder()
         .layer(TraceLayer::new_for_grpc())
