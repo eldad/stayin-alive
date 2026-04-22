@@ -30,9 +30,7 @@ fn default_jitter() -> f64 {
 /// Both `delay` and `jitter` are optional query parameters.  The combined
 /// maximum (`delay + jitter`) must not exceed 120 seconds; requests that
 /// exceed this limit are rejected with 400 Bad Request.
-pub async fn ping_delay_handler(
-    Query(params): Query<PingDelayParams>,
-) -> impl IntoResponse {
+pub async fn ping_delay_handler(Query(params): Query<PingDelayParams>) -> impl IntoResponse {
     if params.delay < 0.0 || params.jitter < 0.0 {
         return (
             StatusCode::BAD_REQUEST,
