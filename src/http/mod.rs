@@ -5,10 +5,12 @@ use metrics_exporter_prometheus::PrometheusHandle;
 use tower_http::trace::TraceLayer;
 
 mod ping;
+mod ping_delay;
 mod sse;
 mod ws;
 
 pub use ping::ping_handler;
+pub use ping_delay::ping_delay_handler;
 pub use sse::sse_ping_handler;
 pub use ws::ws_handler;
 
@@ -16,6 +18,7 @@ pub use ws::ws_handler;
 pub fn router(prometheus_handle: Arc<PrometheusHandle>) -> Router {
     Router::new()
         .route("/ping", get(ping_handler))
+        .route("/ping-delay", get(ping_delay_handler))
         .route("/sse-ping", get(sse_ping_handler))
         .route("/ws", get(ws_handler))
         .route("/metrics", get(crate::metrics::metrics_handler))
@@ -151,6 +154,64 @@ mod tests {
             text.contains("active_connections"),
             "expected active_connections gauge in metrics output"
         );
+    }
+
+    // ---- /ping-delay ----
+
+    #[tokio::test]
+    async fn ping_delay_returns_ping() {
+        let app = router(test_handle());
+        // Use zero delay/jitter so the test completes immediately.
+        let resp = app
+            .oneshot(get_request("/ping-delay?delay=0&jitter=0"))
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), 200);
+        let body = resp.into_body().collect().await.unwrap().to_bytes();
+        assert_eq!(&body[..], b"ping");
+    }
+
+    #[tokio::test]
+    async fn ping_delay_defaults_accepted() {
+        // The default is 5 s ± 1 s, which is within the 120 s limit.
+        // We don't actually wait; just verify the route exists and params parse.
+        let app = router(test_handle());
+        // Override to zero so the test is instant.
+        let resp = app
+            .oneshot(get_request("/ping-delay?delay=0&jitter=0"))
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), 200);
+    }
+
+    #[tokio::test]
+    async fn ping_delay_exceeds_max_returns_400() {
+        let app = router(test_handle());
+        let resp = app
+            .oneshot(get_request("/ping-delay?delay=100&jitter=21"))
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), 400);
+    }
+
+    #[tokio::test]
+    async fn ping_delay_negative_delay_returns_400() {
+        let app = router(test_handle());
+        let resp = app
+            .oneshot(get_request("/ping-delay?delay=-1&jitter=0"))
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), 400);
+    }
+
+    #[tokio::test]
+    async fn ping_delay_negative_jitter_returns_400() {
+        let app = router(test_handle());
+        let resp = app
+            .oneshot(get_request("/ping-delay?delay=0&jitter=-1"))
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), 400);
     }
 
     // ---- 404 ----

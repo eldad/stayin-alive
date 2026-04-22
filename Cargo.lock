@@ -1530,6 +1530,7 @@ dependencies = [
  "metrics",
  "metrics-exporter-prometheus",
  "prost",
+ "rand 0.9.4",
  "serde",
  "serde_json",
  "thiserror",
