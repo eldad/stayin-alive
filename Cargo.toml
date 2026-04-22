@@ -21,6 +21,7 @@ metrics = "0.24"
 metrics-exporter-prometheus = "0.18"
 rand = "0.9"
 
+[dev-dependencies]
 tower = { version = "0.5", features = ["util"] }
 http-body-util = "0.1"
 tokio-tungstenite = "0.29"
