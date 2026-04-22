@@ -22,9 +22,9 @@ use grpc::StayinAliveService;
 use proto::stayin_alive_server::StayinAliveServer;
 
 /// Default address for the HTTP server.
-const HTTP_ADDR: &str = "0.0.0.0:3000";
+const HTTP_ADDR: &str = "0.0.0.0:8080";
 /// Default address for the gRPC server.
-const GRPC_ADDR: &str = "0.0.0.0:50051";
+const GRPC_ADDR: &str = "0.0.0.0:6565";
 
 #[tokio::main]
 async fn main() -> Result<()> {
