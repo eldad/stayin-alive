@@ -53,7 +53,7 @@ impl TrackedSseEvent {
 
     /// Set the event's data field (`data:<content>`).
     pub fn data<T: AsRef<str>>(mut self, data: T) -> Self {
-        self.data_len = data.as_ref().len();
+        self.data_len += data.as_ref().len();
         self.inner = self.inner.data(data);
         self
     }
@@ -89,8 +89,9 @@ impl<S: Stream<Item = TrackedSseEvent>> Stream for TrackedStream<S> {
             Poll::Ready(Some(tracked)) => {
                 let event_type = tracked
                     .event_type
-                    .clone()
-                    .unwrap_or_else(|| "message".into());
+                    .as_deref()
+                    .unwrap_or("message")
+                    .to_owned();
                 let labels = [
                     ("path", self.path.clone()),
                     ("event", event_type),
