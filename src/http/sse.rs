@@ -33,23 +33,41 @@ fn default_interval_ms() -> u64 {
     1000
 }
 
-/// Holds SSE event metadata so metrics can be recorded before converting
-/// to an opaque [`Event`].
-struct SseEventData {
-    event_type: String,
-    data: String,
+/// Wraps an axum [`Event`] while recording metadata (event type and data
+/// length) for metrics.  Exposes the same builder API as [`Event`] so that
+/// handler code reads identically.
+#[derive(Default)]
+pub struct TrackedSseEvent {
+    inner: Event,
+    event_type: Option<String>,
+    data_len: usize,
 }
 
-impl SseEventData {
-    fn into_axum_event(self) -> Event {
-        Event::default().event(self.event_type).data(self.data)
+impl TrackedSseEvent {
+    /// Set the event's name field (`event:<event-name>`).
+    pub fn event<T: AsRef<str>>(mut self, event: T) -> Self {
+        self.event_type = Some(event.as_ref().to_owned());
+        self.inner = self.inner.event(event);
+        self
+    }
+
+    /// Set the event's data field (`data:<content>`).
+    pub fn data<T: AsRef<str>>(mut self, data: T) -> Self {
+        self.data_len = data.as_ref().len();
+        self.inner = self.inner.data(data);
+        self
+    }
+
+    /// Returns `true` when the event type is `"error"`.
+    fn is_error(&self) -> bool {
+        self.event_type.as_deref() == Some("error")
     }
 }
 
-/// Wraps an inner `Stream` of [`SseEventData`], holding a `ConnectionGuard`
-/// for the duration of the stream's lifetime.  When the SSE client
-/// disconnects, axum drops the stream which drops the guard and decrements
-/// the connection gauge.
+/// Wraps an inner `Stream` of [`TrackedSseEvent`], holding a
+/// [`ConnectionGuard`] for the duration of the stream's lifetime.  When the
+/// SSE client disconnects, axum drops the stream which drops the guard and
+/// decrements the connection gauge.
 ///
 /// Each yielded item is inspected to record metrics:
 /// * Non-error events increment `sse_events_total`.
@@ -63,27 +81,31 @@ struct TrackedStream<S> {
     path: String,
 }
 
-impl<S: Stream<Item = SseEventData>> Stream for TrackedStream<S> {
+impl<S: Stream<Item = TrackedSseEvent>> Stream for TrackedStream<S> {
     type Item = Result<Event, std::convert::Infallible>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         match self.inner.as_mut().poll_next(cx) {
-            Poll::Ready(Some(event_data)) => {
+            Poll::Ready(Some(tracked)) => {
+                let event_type = tracked
+                    .event_type
+                    .clone()
+                    .unwrap_or_else(|| "message".into());
                 let labels = [
                     ("path", self.path.clone()),
-                    ("event", event_data.event_type.clone()),
+                    ("event", event_type),
                 ];
 
-                if event_data.event_type == "error" {
+                if tracked.is_error() {
                     metrics::counter!(METRIC_SSE_ERRORS_TOTAL, &labels).increment(1);
                 } else {
                     metrics::counter!(METRIC_SSE_EVENTS_TOTAL, &labels).increment(1);
                 }
 
                 metrics::counter!(METRIC_SSE_EVENT_BYTES_TOTAL, &labels)
-                    .increment(event_data.data.len() as u64);
+                    .increment(tracked.data_len as u64);
 
-                Poll::Ready(Some(Ok(event_data.into_axum_event())))
+                Poll::Ready(Some(Ok(tracked.inner)))
             }
             Poll::Ready(None) => Poll::Ready(None),
             Poll::Pending => Poll::Pending,
@@ -102,11 +124,8 @@ pub async fn sse_ping_handler(
     let interval = Duration::from_millis(params.interval_ms);
 
     let inner = Box::pin(
-        stream::repeat_with(|| SseEventData {
-            event_type: "ping".into(),
-            data: "ping".into(),
-        })
-        .throttle(interval),
+        stream::repeat_with(|| TrackedSseEvent::default().event("ping").data("ping"))
+            .throttle(interval),
     );
 
     let stream = TrackedStream {
