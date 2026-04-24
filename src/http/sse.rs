@@ -5,7 +5,7 @@ use std::{
 };
 
 use axum::{
-    extract::Query,
+    extract::{MatchedPath, Query},
     response::{
         sse::{Event, KeepAlive},
         Sse,
@@ -15,7 +15,7 @@ use futures::stream::{self, Stream};
 use serde::Deserialize;
 use tokio_stream::StreamExt as _;
 
-use crate::metrics::ConnectionGuard;
+use crate::metrics::{ConnectionGuard, METRIC_SSE_EVENTS_TOTAL};
 
 /// Query parameters accepted by the SSE endpoint.
 #[derive(Debug, Deserialize)]
@@ -33,16 +33,24 @@ fn default_interval_ms() -> u64 {
 /// Wraps an inner `Stream`, holding a `ConnectionGuard` for the duration of the
 /// stream's lifetime.  When the SSE client disconnects, axum drops the stream
 /// which drops the guard and decrements the connection gauge.
+///
+/// Each yielded item also increments the `sse_events_total` counter, labelled
+/// by the matched request path.
 struct TrackedStream<S> {
     inner: Pin<Box<S>>,
     _guard: ConnectionGuard,
+    path: String,
 }
 
 impl<S: Stream> Stream for TrackedStream<S> {
     type Item = S::Item;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        self.inner.as_mut().poll_next(cx)
+        let poll = self.inner.as_mut().poll_next(cx);
+        if let Poll::Ready(Some(_)) = &poll {
+            metrics::counter!(METRIC_SSE_EVENTS_TOTAL, "path" => self.path.clone()).increment(1);
+        }
+        poll
     }
 }
 
@@ -51,6 +59,7 @@ impl<S: Stream> Stream for TrackedStream<S> {
 /// Keeps the connection open and emits a "ping" event at the requested
 /// interval (`interval_ms` query parameter, default 1000 ms).
 pub async fn sse_ping_handler(
+    matched_path: MatchedPath,
     Query(params): Query<SsePingParams>,
 ) -> Sse<impl Stream<Item = Result<Event, std::convert::Infallible>>> {
     let interval = Duration::from_millis(params.interval_ms);
@@ -62,6 +71,7 @@ pub async fn sse_ping_handler(
     let stream = TrackedStream {
         inner,
         _guard: ConnectionGuard::new("sse"),
+        path: matched_path.as_str().to_owned(),
     };
 
     Sse::new(stream).keep_alive(KeepAlive::default())

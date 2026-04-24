@@ -12,6 +12,7 @@ use tokio::time::Instant;
 const METRIC_HTTP_REQUEST_DURATION: &str = "http_request_duration_seconds";
 const METRIC_HTTP_REQUESTS_TOTAL: &str = "http_requests_total";
 const METRIC_ACTIVE_CONNECTIONS: &str = "active_connections";
+pub const METRIC_SSE_EVENTS_TOTAL: &str = "sse_events_total";
 
 const HTTP_REQUEST_DURATION_BUCKETS: &[f64] = &[
     0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0,
