@@ -39,7 +39,7 @@ fn default_interval_ms() -> u64 {
 struct TrackedStream<S> {
     inner: Pin<Box<S>>,
     _guard: ConnectionGuard,
-    path: String,
+    events_counter: metrics::Counter,
 }
 
 impl<S: Stream> Stream for TrackedStream<S> {
@@ -48,7 +48,7 @@ impl<S: Stream> Stream for TrackedStream<S> {
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let poll = self.inner.as_mut().poll_next(cx);
         if let Poll::Ready(Some(_)) = &poll {
-            metrics::counter!(METRIC_SSE_EVENTS_TOTAL, "path" => self.path.clone()).increment(1);
+            self.events_counter.increment(1);
         }
         poll
     }
@@ -68,10 +68,13 @@ pub async fn sse_ping_handler(
         stream::repeat_with(|| Ok(Event::default().event("ping").data("ping"))).throttle(interval),
     );
 
+    let events_counter =
+        metrics::counter!(METRIC_SSE_EVENTS_TOTAL, "path" => matched_path.as_str().to_owned());
+
     let stream = TrackedStream {
         inner,
         _guard: ConnectionGuard::new("sse"),
-        path: matched_path.as_str().to_owned(),
+        events_counter,
     };
 
     Sse::new(stream).keep_alive(KeepAlive::default())
